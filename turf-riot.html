@@ -23,6 +23,9 @@ html,body{height:100%}
 body{background:var(--night);color:var(--cream);font-family:var(--body);overflow:hidden;-webkit-user-select:none;user-select:none}
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
 #game.playing{cursor:none}
+#exitBtn{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);right:calc(env(safe-area-inset-right,0px) + 12px);z-index:5;font:inherit;font-weight:700;font-size:14px;padding:8px 14px;border-radius:10px;border:2px solid var(--line);background:color-mix(in srgb,var(--night) 88%,transparent);color:var(--cream);cursor:pointer}
+#exitBtn:hover{border-color:var(--muted)}
+#exitBtn:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
 #safe{position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
 .overlay{position:fixed;inset:0;overflow-y:auto;display:flex;justify-content:center;align-items:flex-start;
   padding-block:calc(env(safe-area-inset-top,0px) + 28px) calc(env(safe-area-inset-bottom,0px) + 28px);
@@ -115,6 +118,7 @@ tr.me td{color:var(--gold);font-weight:500}
 </style>
 
 <canvas id="game" tabindex="0" aria-label="Turf Riot arena"></canvas>
+<button type="button" id="exitBtn" hidden>Exit</button>
 <div id="safe"></div>
 
 <div id="menu" class="overlay">
@@ -353,17 +357,17 @@ const CLASSES = {
     abil: { name: 'Decoy', cd: 8 },
     kit: ['Long Shot', 'Slow to reload, huge damage from far away.'],
     ab: ['Decoy', 'Send a double running ahead and fade from view.'] },
-  shade: { name: 'Shade', role: 'Spy', hp: 115, speed: 235, r: 15, range: 420, pref: 260,
-    fire: { rate: .45, count: 1, spread: 0, speed: 900, dmg: 24, life: .5, r: 3 },
+  shade: { name: 'Shade', role: 'Spy', hp: 115, speed: 235, r: 15, range: 560, pref: 300,
+    fire: { rate: .36, count: 1, spread: 0, speed: 1050, dmg: 30, life: .55, r: 4 },
     abil: { name: 'Vanish', cd: 22 },
-    kit: ['Hush Pistol', 'Quiet, accurate shots. Your first shot out of Vanish hits twice as hard.'],
+    kit: ['Whisper SMG', 'Fast, quiet and pin-accurate. Your first shot out of Vanish hits three times as hard.'],
     ab: ['Vanish', 'Turn invisible for 10 seconds. Firing or taking a hit shows you again.'] },
 };
 // Armour: the share of incoming damage each class shrugs off.
 const ARMOR = { sprinter: 0, anchor: .2, brick: .3, tinkerer: .1, spark: 0, bloom: .1, lurker: 0, shade: 0 };
 for (const k in ARMOR) CLASSES[k].armor = ARMOR[k];
 // Accuracy: 1 is dead on; lower values scatter shots, more so while running.
-const ACC = { sprinter: .72, anchor: .82, brick: .62, tinkerer: .66, spark: .86, bloom: 1, lurker: .96, shade: .92 };
+const ACC = { sprinter: .72, anchor: .82, brick: .62, tinkerer: .66, spark: .86, bloom: 1, lurker: .96, shade: .96 };
 for (const k in ACC) CLASSES[k].acc = ACC[k];
 const KEYS = Object.keys(CLASSES);
 const DIFF = { easy: { err: .24, turn: 4.5, think: .32 }, normal: { err: .13, turn: 7.5, think: .2 }, hard: { err: .06, turn: 12, think: .11 } };
@@ -710,7 +714,7 @@ function startMatch(playerCls, demo, setup = null) {
 function fire(u) {
   if (u.loot.freeze > 0) { fireFreeze(u); return; }
   const c = CLASSES[u.cls], f = c.fire;
-  const ambush = u.cls === 'shade' && u.stealth > 0 ? 2 : 1;
+  const ambush = u.cls === 'shade' && u.stealth > 0 ? 3 : 1;
   const miss = (1 - accOf(u)) * .35 * (Math.hypot(u.vx, u.vy) > 60 ? 1.5 : 1);
   for (let i = 0; i < f.count; i++) {
     const off = (f.count > 1 ? (i / (f.count - 1) - .5) * f.spread * 2 + rand(-.04, .04) : rand(-f.spread, f.spread)) + rand(-miss, miss);
@@ -1643,6 +1647,7 @@ $('startBtn').onclick = play;
 $('againBtn').onclick = () => { if (G && G.net) onlineAgain(); else play(); };
 $('changeBtn').onclick = () => { if (G && G.net) leaveOnline(); toMenu(); };
 $('resumeBtn').onclick = togglePause;
+$('exitBtn').onclick = () => { if (G && !G.demo && !G.over) togglePause(); };
 $('quitBtn').onclick = () => { if (G && G.net) leaveOnline(); toMenu(); };
 
 // ---------- drawing ----------
@@ -1695,9 +1700,11 @@ function drawWeapon(c, cls, r, T, muzzle) {
     c.fillStyle = INK; c.fillRect(r * .7, 4, 5, 6);
     tip = r * 1.55;
   } else if (cls === 'shade') {
-    c.fillStyle = INK; rr(c, r * .3, -4, r * .75, 8, 2); c.fill();
-    c.fillStyle = '#4a4660'; rr(c, r * 1, -3, r * .65, 6, 3); c.fill();
-    tip = r * 1.7;
+    c.fillStyle = INK; rr(c, r * .3, -5, r * .9, 10, 2); c.fill();
+    c.fillStyle = '#4a4660'; rr(c, r * 1.1, -3.5, r * .8, 7, 3.5); c.fill();
+    c.fillStyle = INK; c.fillRect(r * .55, 4, 5, 7);
+    c.save(); if (!(G && G.riot)) { c.shadowColor = VIOLET; c.shadowBlur = 8; } c.fillStyle = VIOLET; c.fillRect(r * .5, -6.5, r * .5, 2); c.restore();
+    tip = r * 1.95;
   } else {
     c.fillStyle = INK; rr(c, r * .3, -7, r * 1.05, 14, 3); c.fill();
     c.fillStyle = '#8a84a6'; c.fillRect(r * .35, -4.5, r * .95, 3); c.fillRect(r * .35, 1.5, r * .95, 3);
@@ -2387,7 +2394,7 @@ function drawHud() {
   // kill feed
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   G.feed.forEach((f, i) => {
-    const y = Tp + 12 + i * 24; ctx.globalAlpha = Math.min(1, f.t);
+    const y = Tp + 60 + i * 24; ctx.globalAlpha = Math.min(1, f.t);
     ctx.font = `600 ${small ? 11 : 13}px ${BODY}`;
     const vic = f.v.name, kil = f.k ? f.k.name : '';
     const vw = ctx.measureText(vic).width, mid = '  ▸  ', midw = ctx.measureText(mid).width, kw = ctx.measureText(kil).width;
@@ -3140,6 +3147,7 @@ function frame(now) {
     else if (!G.over) { acc += dt; while (acc >= DT) { update(DT); acc -= DT; } }
     else { for (const p of G.parts) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; } }
   }
+  $('exitBtn').hidden = !(G && !G.demo && !G.over && $('pause').hidden && $('results').hidden);
   if (G && G.net === 'host' && NET.match && now - NET.sendAt > 66) { NET.sendAt = now; NET.match.presence({ s: encodeSnap() }).catch(() => {}); }
   render(dt);
   requestAnimationFrame(frame);
